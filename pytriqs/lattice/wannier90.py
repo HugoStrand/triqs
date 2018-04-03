@@ -43,12 +43,12 @@ def parse_hopping_from_wannier90_hr_dat(filename):
     #print 'num_wann =', num_wann
     #print 'nrpts =', nrpts
 
-    nlines = int(nrpts / 15)
+    nlines = int(np.ceil(float(nrpts / 15.)))
 
-    deg = "".join(lines[:nlines])
-    deg = np.loadtxt(StringIO(deg), dtype=np.int)
-    deg = deg.flatten()
-
+    deg = np.array([])
+    for line in lines[:nlines]:
+        deg = np.concatenate((deg, np.loadtxt(StringIO(line), dtype=np.int)))
+    
     assert( deg.shape == (nrpts,) )
 
     hopp = "".join(lines[nlines:])
