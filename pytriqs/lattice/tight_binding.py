@@ -23,13 +23,16 @@
 __all__ = ['BravaisLattice', 'TightBinding', 'dos', 'dos_patch', 'energies_on_bz_grid', 'energies_on_bz_path', 'energy_matrix_on_bz_path',
            'hopping_stack', 'TBLattice']
 
+from lattice_tools import BrillouinZone as BrillouinZone
 from lattice_tools import BravaisLattice as BravaisLattice
 from lattice_tools import TightBinding as TightBinding
 from lattice_tools import dos_patch as dos_patch_c
 from lattice_tools import dos as dos_c
 from lattice_tools import energies_on_bz_grid, energies_on_bz_path, hopping_stack, energy_matrix_on_bz_path
 from pytriqs.dos import DOS
+from pytriqs.gf import Gf, MeshBrillouinZone, MeshCyclicLattice
 import numpy
+import numpy as np
 
 # MOVE THIS BACK INTO CYTHON !!!!
 
@@ -62,6 +65,7 @@ class TBLattice:
         self._hop = dict ( ( reg(k), numpy.array(v)) for k, v in hopping.items())
         orb = dict ( (str(i), orb) for (i, orb) in enumerate(orbital_positions ))
         self.bl = BravaisLattice(units, orbital_positions)
+        self.bz = BrillouinZone(self.bl)
         self.tb = TightBinding(self.bl, self._hop) #, orbital_positions )
         self.dim = self.bl.dim
         self.NOrbitalsInUnitCell = self.bl.n_orbitals
@@ -82,4 +86,29 @@ class TBLattice:
 
     #def dos(self) : d = dos (TB, nkpts= 100, neps = 100, name = 'dos2')
 
+    def periodization_matrix(self, n_k):
+        n_k = np.array(n_k)
+        assert( len(n_k) == 3 )
+        assert( n_k.dtype == np.int )
+        periodization_matrix = np.diag(np.array(list(n_k), dtype=np.int32))
+        return periodization_matrix
+    
+    def get_kmesh(self, n_k):
+        return MeshBrillouinZone(self.bz, self.periodization_matrix(n_k))
 
+    def get_rmesh(self, n_k):
+        return MeshCyclicLattice(self.bl, self.periodization_matrix(n_k))
+    
+    def on_gf_mesh_brillouin_zone(self, n_k):
+
+        target_shape = [self.NOrbitalsInUnitCell] * 2
+
+        kmesh = self.get_kmesh(n_k)
+
+        e_k = Gf(mesh=kmesh, target_shape=target_shape)
+
+        k_vec = np.array([k.value for k in kmesh])
+        k_vec_rel = np.dot(np.linalg.inv(self.bz.units()).T, k_vec.T).T   
+        e_k.data[:] = self.hopping(k_vec_rel.T).transpose(2, 0, 1)
+
+        return e_k
