@@ -24,7 +24,7 @@
  *
  * Copyright (C) 2011-2017 by M. Ferrero, O. Parcollet
  * Copyright (C) 2018- by Simons Foundation
- *               authors : O. Parcollet, N. Wentzell 
+ *               authors : O. Parcollet, N. Wentzell, H. UR Strand
  *
  * TRIQS is free software: you can redistribute it and/or modify it under the
  * terms of the GNU General Public License as published by the Free Software
@@ -43,19 +43,10 @@
 #include "../../gfs.hpp"
 #include "./fourier_common.hpp"
 
-#define ASSERT_EQUAL(X, Y, MESS)                                                                                                                     \
-  if (X != Y) TRIQS_RUNTIME_ERROR << MESS;
-
 namespace triqs::gfs {
 
   // The implementation is almost the same in both cases...
-  template <typename V1, typename V2> gf_vec_t<V1> __impl(int fftw_backward_forward, gf_mesh<V1> const &out_mesh, gf_vec_cvt<V2> g_in) {
-
-    //ASSERT_EQUAL(g_out.data().shape(), g_in.data().shape(), "Meshes are different");
-    //ASSERT_EQUAL(g_out.data().indexmap().strides()[1], g_out.data().shape()[1], "Unexpected strides in fourier implementation");
-    //ASSERT_EQUAL(g_out.data().indexmap().strides()[2], 1, "Unexpected strides in fourier implementation");
-    //ASSERT_EQUAL(g_in.data().indexmap().strides()[1], g_in.data().shape()[1], "Unexpected strides in fourier implementation");
-    //ASSERT_EQUAL(g_in.data().indexmap().strides()[2], 1, "Unexpected strides in fourier implementation");
+  template <typename V1, typename V2> void * __impl_plan(int fftw_backward_forward, gf_mesh<V1> const &out_mesh, gf_vec_cvt<V2> g_in) {
 
     //check periodization_matrix is diagonal
     for (int i = 0; i < g_in.mesh().periodization_matrix.shape()[0]; i++)
@@ -66,21 +57,49 @@ namespace triqs::gfs {
     long n_others = second_dim(g_in.data());
 
     auto dims = g_in.mesh().get_dimensions();
-    _fourier_base(g_in.data(), g_out.data(), dims.size(), dims.ptr(), n_others,  fftw_backward_forward);
+    auto p =_fourier_base_plan(g_in.data(), g_out.data(), dims.size(), dims.ptr(), n_others, fftw_backward_forward);
 
-    return std::move(g_out);
+    return p;
   }
 
+  void * _fourier_plan(gf_mesh<cyclic_lattice> const &r_mesh, gf_vec_cvt<brillouin_zone> gk) {
+    return __impl_plan(FFTW_FORWARD, r_mesh, gk);
+  }  
+
+  void * _fourier_plan(gf_mesh<brillouin_zone> const &k_mesh, gf_vec_cvt<cyclic_lattice> gr) {
+    return __impl_plan(FFTW_BACKWARD, k_mesh, gr);
+  }
+
+  
   // ------------------------ DIRECT TRANSFORM --------------------------------------------
 
-  gf_vec_t<cyclic_lattice> _fourier_impl(gf_mesh<cyclic_lattice> const &r_mesh, gf_vec_cvt<brillouin_zone> gk) {
-    auto gr = __impl(FFTW_FORWARD, r_mesh,  gk);
+  gf_vec_t<cyclic_lattice> _fourier_impl(gf_mesh<cyclic_lattice> const &r_mesh, gf_vec_cvt<brillouin_zone> gk, void * p) {
+    auto gr = gf_vec_t<cyclic_lattice>{r_mesh, gk.target_shape()[0]};
+    _fourier_base(gk.data(), gr.data(), p);
     gr.data() /= gk.mesh().size();
     return std::move(gr);
   }
 
+  gf_vec_t<cyclic_lattice> _fourier_impl(gf_mesh<cyclic_lattice> const &r_mesh, gf_vec_cvt<brillouin_zone> gk) {
+    auto p = _fourier_plan(r_mesh, gk);
+    auto gr = _fourier_impl(r_mesh, gk, p);
+    _fourier_destroy_plan(p);    
+    return std::move(gr);
+  }
+  
   // ------------------------ INVERSE TRANSFORM --------------------------------------------
 
-  gf_vec_t<brillouin_zone> _fourier_impl(gf_mesh<brillouin_zone> const &k_mesh, gf_vec_cvt<cyclic_lattice> gr) { return __impl(FFTW_BACKWARD, k_mesh, gr); }
+  gf_vec_t<brillouin_zone> _fourier_impl(gf_mesh<brillouin_zone> const &k_mesh, gf_vec_cvt<cyclic_lattice> gr, void * p) {
+    auto gk = gf_vec_t<brillouin_zone>{k_mesh, gr.target_shape()[0]};
+    _fourier_base(gr.data(), gk.data(), p);
+    return std::move(gk);
+  }
 
+  gf_vec_t<brillouin_zone> _fourier_impl(gf_mesh<brillouin_zone> const &k_mesh, gf_vec_cvt<cyclic_lattice> gr) {
+    auto p = _fourier_plan(k_mesh, gr);
+    auto gk = _fourier_impl(k_mesh, gr, p);
+    _fourier_destroy_plan(p);
+    return std::move(gk);
+  }
+  
 } // namespace triqs::gfs

@@ -4,7 +4,7 @@
  *
  * Copyright (C) 2011-2017 by M. Ferrero, O. Parcollet
  * Copyright (C) 2018- by Simons Foundation
- *               authors : O. Parcollet, N. Wentzell 
+ *               authors : O. Parcollet, N. Wentzell, H. UR Strand 
  *
  * TRIQS is free software: you can redistribute it and/or modify it under the
  * terms of the GNU General Public License as published by the Free Software
@@ -98,7 +98,24 @@ namespace triqs::gfs {
 
   // ------------------------ DIRECT TRANSFORM --------------------------------------------
 
-  gf_vec_t<imfreq> _fourier_impl(gf_mesh<imfreq> const &iw_mesh, gf_vec_cvt<imtime> gt, arrays::array_const_view<dcomplex, 2> mom_23) {
+  void * _fourier_plan(gf_mesh<imfreq> const &iw_mesh, gf_vec_cvt<imtime> gt, arrays::array_const_view<dcomplex, 2> mom_23) {
+
+    double beta = gt.mesh().domain().beta;
+    auto L      = gt.mesh().size() - 1;
+    if (L < 2 * (iw_mesh.last_index() + 1))
+      TRIQS_RUNTIME_ERROR << "Fourier: The time mesh mush be at least twice as long as the number of positive frequencies :\n gt.mesh().size() =  "
+                          << gt.mesh().size() << " gw.mesh().last_index()" << iw_mesh.last_index();
+
+    long n_others = second_dim(gt.data());
+
+    array<dcomplex, 2> _gout(L, n_others); // FIXME Why do we need this dimension to be one less than gt.mesh().size() ?
+    array<dcomplex, 2> _gin(L + 1, n_others);
+
+    int dims[] = {int(L)};
+    return _fourier_base_plan(_gin, _gout, 1, dims, n_others, FFTW_BACKWARD);
+  }
+  
+  gf_vec_t<imfreq> _fourier_impl(gf_mesh<imfreq> const &iw_mesh, gf_vec_cvt<imtime> gt, void * p, arrays::array_const_view<dcomplex, 2> mom_23) {
     if (mom_23.is_empty()) mom_23.rebind(fit_derivatives(gt));
 
     double beta = gt.mesh().domain().beta;
@@ -148,8 +165,9 @@ namespace triqs::gfs {
         _gin(t.index(), _) = fact * (gt[t] - (oneBoson(a1, b1, t, beta) + oneBoson(a2, b2, t, beta) + oneBoson(a3, b3, t, beta)));
     }
 
-    int dims[] = {int(L)};
-    _fourier_base(_gin, _gout, 1, dims, n_others, FFTW_BACKWARD);
+    //int dims[] = {int(L)};
+    //_fourier_base(_gin, _gout, 1, dims, n_others, FFTW_BACKWARD);
+    _fourier_base(_gin, _gout, p);
 
     auto gw = gf_vec_t<imfreq>{iw_mesh, {int(n_others)}};
 
@@ -159,9 +177,33 @@ namespace triqs::gfs {
     return std::move(gw);
   }
 
+  gf_vec_t<imfreq> _fourier_impl(gf_mesh<imfreq> const &iw_mesh, gf_vec_cvt<imtime> gt, arrays::array_const_view<dcomplex, 2> mom_23) {
+    auto p = _fourier_plan(iw_mesh, gt, mom_23);
+    auto gw = _fourier_impl(iw_mesh, gt, p, mom_23);
+    _fourier_destroy_plan(p);
+    return std::move(gw);
+  }  
   // ------------------------ INVERSE TRANSFORM --------------------------------------------
 
-  gf_vec_t<imtime> _fourier_impl(gf_mesh<imtime> const &tau_mesh, gf_vec_cvt<imfreq> gw, arrays::array_const_view<dcomplex, 2> mom_123) {
+  void * _fourier_plan(gf_mesh<imtime> const &tau_mesh, gf_vec_cvt<imfreq> gw, arrays::array_const_view<dcomplex, 2> mom_123) {
+
+    TRIQS_ASSERT2(!gw.mesh().positive_only(), "Fourier is only implemented for g(i omega_n) with full mesh (positive and negative frequencies)");
+
+    long L      = tau_mesh.size() - 1;
+    if (L < 2 * (gw.mesh().last_index() + 1))
+      TRIQS_RUNTIME_ERROR << "Inverse Fourier: The time mesh mush be at least twice as long as the freq mesh :\n gt.mesh().size() =  "
+                          << tau_mesh.size() << " gw.mesh().last_index()" << gw.mesh().last_index();
+
+    long n_others = second_dim(gw.data());
+
+    array<dcomplex, 2> _gin(L, n_others); // FIXME Why do we need this dimension to be one less than gt.mesh().size() ?
+    array<dcomplex, 2> _gout(L + 1, n_others);
+
+    int dims[] = {int(L)};
+    return _fourier_base_plan(_gin, _gout, 1, dims, n_others, FFTW_FORWARD);
+  }
+  
+  gf_vec_t<imtime> _fourier_impl(gf_mesh<imtime> const &tau_mesh, gf_vec_cvt<imfreq> gw, void * p, arrays::array_const_view<dcomplex, 2> mom_123) {
 
     TRIQS_ASSERT2(!gw.mesh().positive_only(), "Fourier is only implemented for g(i omega_n) with full mesh (positive and negative frequencies)");
 
@@ -216,8 +258,9 @@ namespace triqs::gfs {
 
     for (auto const &w : gw.mesh()) _gin((w.index() + L) % L, _) = fact * (gw[w] - (a1 / (w - b1) + a2 / (w - b2) + a3 / (w - b3)));
 
-    int dims[] = {int(L)};
-    _fourier_base(_gin, _gout, 1, dims, n_others, FFTW_FORWARD);
+    //int dims[] = {int(L)};
+    //_fourier_base(_gin, _gout, 1, dims, n_others, FFTW_FORWARD);
+    _fourier_base(_gin, _gout, p);
 
     auto gt = gf_vec_t<imtime>{tau_mesh, {int(n_others)}};
 
@@ -230,6 +273,13 @@ namespace triqs::gfs {
     double pm = (is_fermion ? -1 : 1);
     gt[L]     = pm * (gt[0] + m1);
 
+    return std::move(gt);
+  }
+
+  gf_vec_t<imtime> _fourier_impl(gf_mesh<imtime> const &tau_mesh, gf_vec_cvt<imfreq> gw,  arrays::array_const_view<dcomplex, 2> mom_123) {
+    auto p = _fourier_plan(tau_mesh, gw, mom_123);
+    auto gt = _fourier_impl(tau_mesh, gw, p, mom_123);
+    _fourier_destroy_plan(p);
     return std::move(gt);
   }
 

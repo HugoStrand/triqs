@@ -3,6 +3,8 @@
  * TRIQS: a Toolbox for Research in Interacting Quantum Systems
  *
  * Copyright (C) 2011 by M. Ferrero, O. Parcollet
+ * Copyright (C) 2018- by Simons Foundation
+ *               authors : O. Parcollet, N. Wentzell, H. UR Strand 
  *
  * TRIQS is free software: you can redistribute it and/or modify it under the
  * terms of the GNU General Public License as published by the Free Software
@@ -45,4 +47,33 @@ namespace triqs::gfs {
     fftw_destroy_plan(p);
   }
 
+  void * _fourier_base_plan(array_const_view<dcomplex, 2> in, array_const_view<dcomplex, 2> out, int rank, int *dims, int fftw_count, int fftw_backward_forward) {
+
+    auto p = fftw_plan_many_dft(rank,                        // rank
+                                dims,                        // the dimension
+                                fftw_count,                  // how many FFT : here 1
+                                NULL,                        // in data
+                                NULL,                        // embed : unused. Doc unclear ?
+                                in.indexmap().strides()[0],  // stride of the in data
+                                1,                           // in : shift for multi fft.
+                                NULL,                        // out data
+                                NULL,                        // embed : unused. Doc unclear ?
+                                out.indexmap().strides()[0], // stride of the out data
+                                1,                           // out : shift for multi fft.
+                                fftw_backward_forward, FFTW_ESTIMATE);
+    
+    return (void *) p;
+  }
+  
+  void _fourier_base(array_const_view<dcomplex, 2> in, array_view<dcomplex, 2> out, void * p) {
+
+    auto in_fft  = reinterpret_cast<fftw_complex *>(in.data_start());
+    auto out_fft = reinterpret_cast<fftw_complex *>(out.data_start());
+
+    fftw_execute_dft((fftw_plan) p, in_fft, out_fft);
+  }
+
+  void _fourier_base_destroy_plan(void * p) { fftw_destroy_plan((fftw_plan) p); }
+  void _fourier_destroy_plan(void * p) { _fourier_base_destroy_plan(p); }
+  
 } // namespace triqs::gfs
