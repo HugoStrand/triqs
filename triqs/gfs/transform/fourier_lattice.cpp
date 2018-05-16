@@ -54,7 +54,7 @@ namespace triqs::gfs {
         if (i != j and g_in.mesh().periodization_matrix(i, j) != 0) TRIQS_RUNTIME_ERROR << "Periodization matrix must be diagonal for FFTW to work";
 
     auto g_out    = gf_vec_t<V1>{out_mesh, g_in.target_shape()[0]};
-    long n_others = second_dim(g_in.data());
+    int n_others = second_dim(g_in.data());
 
     auto dims = g_in.mesh().get_dimensions();
     auto p =_fourier_base_plan(g_in.data(), g_out.data(), dims.size(), dims.ptr(), n_others, fftw_backward_forward);

@@ -106,7 +106,7 @@ namespace triqs::gfs {
       TRIQS_RUNTIME_ERROR << "Fourier: The time mesh mush be at least twice as long as the number of positive frequencies :\n gt.mesh().size() =  "
                           << gt.mesh().size() << " gw.mesh().last_index()" << iw_mesh.last_index();
 
-    long n_others = second_dim(gt.data());
+    int n_others = second_dim(gt.data());
 
     array<dcomplex, 2> _gout(L, n_others); // FIXME Why do we need this dimension to be one less than gt.mesh().size() ?
     array<dcomplex, 2> _gin(L + 1, n_others);
@@ -124,7 +124,7 @@ namespace triqs::gfs {
       TRIQS_RUNTIME_ERROR << "Fourier: The time mesh mush be at least twice as long as the number of positive frequencies :\n gt.mesh().size() =  "
                           << gt.mesh().size() << " gw.mesh().last_index()" << iw_mesh.last_index();
 
-    long n_others = second_dim(gt.data());
+    int n_others = second_dim(gt.data());
 
     array<dcomplex, 2> _gout(L, n_others); // FIXME Why do we need this dimension to be one less than gt.mesh().size() ?
     array<dcomplex, 2> _gin(L + 1, n_others);
@@ -194,7 +194,7 @@ namespace triqs::gfs {
       TRIQS_RUNTIME_ERROR << "Inverse Fourier: The time mesh mush be at least twice as long as the freq mesh :\n gt.mesh().size() =  "
                           << tau_mesh.size() << " gw.mesh().last_index()" << gw.mesh().last_index();
 
-    long n_others = second_dim(gw.data());
+    int n_others = second_dim(gw.data());
 
     array<dcomplex, 2> _gin(L, n_others); // FIXME Why do we need this dimension to be one less than gt.mesh().size() ?
     array<dcomplex, 2> _gout(L + 1, n_others);
@@ -224,7 +224,7 @@ namespace triqs::gfs {
       TRIQS_RUNTIME_ERROR << "Inverse Fourier: The time mesh mush be at least twice as long as the freq mesh :\n gt.mesh().size() =  "
                           << tau_mesh.size() << " gw.mesh().last_index()" << gw.mesh().last_index();
 
-    long n_others = second_dim(gw.data());
+    int n_others = second_dim(gw.data());
 
     array<dcomplex, 2> _gin(L, n_others); // FIXME Why do we need this dimension to be one less than gt.mesh().size() ?
     array<dcomplex, 2> _gout(L + 1, n_others);

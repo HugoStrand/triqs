@@ -44,7 +44,7 @@ namespace triqs::gfs {
     double test = std::abs(gt.mesh().delta() * w_mesh.delta() * L / (2 * M_PI) - 1);
     if (test > 1.e-10) TRIQS_RUNTIME_ERROR << "Meshes are not compatible";
 
-    long n_others = second_dim(gt.data());
+    int n_others = second_dim(gt.data());
     array<dcomplex, 2> _gout(L, n_others);
     array<dcomplex, 2> _gin(L, n_others);
 
@@ -96,7 +96,7 @@ namespace triqs::gfs {
     //a is a number very larger than delta_w and very smaller than wmax-wmin, used in the tail computation
     const double a = gw.mesh().delta() * sqrt(double(L));
 
-    long n_others = second_dim(gw.data());
+    int n_others = second_dim(gw.data());
 
     array<dcomplex, 2> _gin(L, n_others);
     array<dcomplex, 2> _gout(L, n_others);
