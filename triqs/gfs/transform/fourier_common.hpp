@@ -28,13 +28,14 @@
 namespace triqs::gfs {
 
   using namespace triqs::arrays;
+
+  void _fourier_base_destroy_plan(void *p);
+  
   // call to fftw
   void _fourier_base(array_const_view<dcomplex, 2> in, array_view<dcomplex, 2> out, int rank, int *dims, int fftw_count, int fftw_backward_forward);
 
-  void _fourier_base(array_const_view<dcomplex, 2> in, array_view<dcomplex, 2> out, void *p);
-  void *_fourier_base_plan(array_const_view<dcomplex, 2> in, array_const_view<dcomplex, 2> out, int rank, int *dims, int fftw_count,
-                           int fftw_backward_forward);
-  void _fourier_base_destroy_plan(void *p);
-  void _fourier_destroy_plan(void *p);
+  void _fourier_base(array_const_view<dcomplex, 2> in, array_view<dcomplex, 2> out, fourier_plan & p);
+  fourier_plan _fourier_base_plan(array_const_view<dcomplex, 2> in, array_const_view<dcomplex, 2> out, int rank, int *dims, int fftw_count,
+                                  int fftw_backward_forward);
 
 } // namespace triqs::gfs

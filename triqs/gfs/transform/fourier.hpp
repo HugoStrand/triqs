@@ -28,6 +28,15 @@ namespace triqs::gfs {
 
   using namespace triqs::arrays;
 
+  class fourier_plan_base {
+    public:
+    fourier_plan_base(void *plan_ptr) : plan_ptr(plan_ptr){};
+    ~fourier_plan_base();
+    void *plan_ptr;
+  };
+
+  using fourier_plan = std::unique_ptr<fourier_plan_base>;
+  
   /*------------------------------------------------------------------------------------------------------
   *                                  Mesh calculator
   *-----------------------------------------------------------------------------------------------------*/
@@ -76,14 +85,14 @@ namespace triqs::gfs {
   template <typename V> using gf_vec_t = gf<V, tensor_valued<1>>;
   template <typename V> using gf_vec_vt = gf_view<V, tensor_valued<1>>;
   template <typename V> using gf_vec_cvt = gf_const_view<V, tensor_valued<1>>;
-
+    
   // matsubara
   gf_vec_t<imfreq> _fourier_impl(gf_mesh<imfreq> const &iw_mesh, gf_vec_cvt<imtime> gt, array_const_view<dcomplex, 2> mom_23 = {});
   gf_vec_t<imtime> _fourier_impl(gf_mesh<imtime> const &tau_mesh, gf_vec_cvt<imfreq> gw, array_const_view<dcomplex, 2> mom_123 = {});
-  gf_vec_t<imfreq> _fourier_impl(gf_mesh<imfreq> const &iw_mesh, gf_vec_cvt<imtime> gt, void * p, array_const_view<dcomplex, 2> mom_23 = {});
-  gf_vec_t<imtime> _fourier_impl(gf_mesh<imtime> const &tau_mesh, gf_vec_cvt<imfreq> gw, void * p, array_const_view<dcomplex, 2> mom_123 = {});
-  void * _fourier_plan(gf_mesh<imfreq> const &iw_mesh, gf_vec_cvt<imtime> gt, array_const_view<dcomplex, 2> mom_23 = {});
-  void * _fourier_plan(gf_mesh<imtime> const &tau_mesh, gf_vec_cvt<imfreq> gw, array_const_view<dcomplex, 2> mom_123 = {});
+  gf_vec_t<imfreq> _fourier_impl(gf_mesh<imfreq> const &iw_mesh, gf_vec_cvt<imtime> gt, fourier_plan & p, array_const_view<dcomplex, 2> mom_23 = {});
+  gf_vec_t<imtime> _fourier_impl(gf_mesh<imtime> const &tau_mesh, gf_vec_cvt<imfreq> gw, fourier_plan & p, array_const_view<dcomplex, 2> mom_123 = {});
+  fourier_plan _fourier_plan(gf_mesh<imfreq> const &iw_mesh, gf_vec_cvt<imtime> gt, array_const_view<dcomplex, 2> mom_23 = {});
+  fourier_plan _fourier_plan(gf_mesh<imtime> const &tau_mesh, gf_vec_cvt<imfreq> gw, array_const_view<dcomplex, 2> mom_123 = {});
 
   // real
   gf_vec_t<refreq> _fourier_impl(gf_mesh<refreq> const &w_mesh, gf_vec_cvt<retime> gt, array_const_view<dcomplex, 2> mom_12 = {});
@@ -92,10 +101,10 @@ namespace triqs::gfs {
   // lattice
   gf_vec_t<cyclic_lattice> _fourier_impl(gf_mesh<cyclic_lattice> const &r_mesh, gf_vec_cvt<brillouin_zone> gk);
   gf_vec_t<brillouin_zone> _fourier_impl(gf_mesh<brillouin_zone> const &k_mesh, gf_vec_cvt<cyclic_lattice> gr);
-  gf_vec_t<cyclic_lattice> _fourier_impl(gf_mesh<cyclic_lattice> const &r_mesh, gf_vec_cvt<brillouin_zone> gk, void * p);
-  gf_vec_t<brillouin_zone> _fourier_impl(gf_mesh<brillouin_zone> const &k_mesh, gf_vec_cvt<cyclic_lattice> gr, void * p);
-  void * _fourier_plan(gf_mesh<cyclic_lattice> const &r_mesh, gf_vec_cvt<brillouin_zone> gk);
-  void * _fourier_plan(gf_mesh<brillouin_zone> const &k_mesh, gf_vec_cvt<cyclic_lattice> gr);
+  gf_vec_t<cyclic_lattice> _fourier_impl(gf_mesh<cyclic_lattice> const &r_mesh, gf_vec_cvt<brillouin_zone> gk, fourier_plan & p);
+  gf_vec_t<brillouin_zone> _fourier_impl(gf_mesh<brillouin_zone> const &k_mesh, gf_vec_cvt<cyclic_lattice> gr, fourier_plan & p);
+  fourier_plan _fourier_plan(gf_mesh<cyclic_lattice> const &r_mesh, gf_vec_cvt<brillouin_zone> gk);
+  fourier_plan _fourier_plan(gf_mesh<brillouin_zone> const &k_mesh, gf_vec_cvt<cyclic_lattice> gr);
 
   // general
   void _fourier_destroy_plan(void *p);
@@ -134,7 +143,7 @@ namespace triqs::gfs {
 
   // this function just regroups the function, and calls the vector_valued gf core implementation
   template <int N, typename V1, typename V2, typename T, typename... OptArgs>
-  void _fourier_with_plan(gf_const_view<V1, T> gin, gf_view<V2, T> gout, void * p, OptArgs const &... opt_args) {
+  void _fourier_with_plan(gf_const_view<V1, T> gin, gf_view<V2, T> gout, fourier_plan & p, OptArgs const &... opt_args) {
 
     //gf_mesh<V2> out_mesh = std::get<N>(gout.mesh());
     auto const &out_mesh = std::get<N>(gout.mesh()); // FIXME singlevar??
@@ -157,10 +166,10 @@ namespace triqs::gfs {
     
   // this function just regroups the function, and calls the vector_valued gf core implementation
   template <int N, typename V1, typename V2, typename T, typename... OptArgs>
-  void * _fourier_plan(gf_const_view<V1, T> gin, gf_view<V2, T> gout, OptArgs const &... opt_args) {
+  fourier_plan _fourier_plan(gf_const_view<V1, T> gin, gf_view<V2, T> gout, OptArgs const &... opt_args) {
     auto const &out_mesh = std::get<N>(gout.mesh());
     auto p = _fourier_plan(out_mesh, flatten_gf_2d<N>(gin), flatten_2d(opt_args, N)...);
-    return p;
+    return std::move(p);
   }  
   
   /* *-----------------------------------------------------------------------------------------------------

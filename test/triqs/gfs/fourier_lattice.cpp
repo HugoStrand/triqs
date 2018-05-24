@@ -44,10 +44,16 @@ template <int TARGET_RANK> void test_fourier() {
     auto Gk = gf<brillouin_zone, target_t>{{bz, N_k}, shape};
     auto p = _fourier_plan<0>(gf_const_view(Gr), gf_view(Gk));
     _fourier_with_plan<0>(gf_const_view(Gr), gf_view(Gk), p);
-    _fourier_destroy_plan(p);
     EXPECT_GF_NEAR(Gk, Gk1, precision);
   }
 
+  {
+    auto Gr1 = gf<cyclic_lattice, target_t>{{N_k, N_k}, shape};
+    auto p = _fourier_plan<0>(gf_const_view(Gk1), gf_view(Gr1));
+    _fourier_with_plan<0>(gf_const_view(Gk1), gf_view(Gr1), p);
+    EXPECT_GF_NEAR(Gr, Gr1, precision);
+  }
+  
   // Test EXCEPTION for non-diagonal periodization matrix
   auto per_mat = matrix<int>{{{2, 1, 0}, {-1, 2, 0}, {0, 0, 1}}};
   Gr           = gf<cyclic_lattice, target_t>{{bl, per_mat}, shape};

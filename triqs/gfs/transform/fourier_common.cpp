@@ -47,7 +47,7 @@ namespace triqs::gfs {
     fftw_destroy_plan(p);
   }
 
-  void * _fourier_base_plan(array_const_view<dcomplex, 2> in, array_const_view<dcomplex, 2> out, int rank, int *dims, int fftw_count, int fftw_backward_forward) {
+  fourier_plan _fourier_base_plan(array_const_view<dcomplex, 2> in, array_const_view<dcomplex, 2> out, int rank, int *dims, int fftw_count, int fftw_backward_forward) {
 
     auto p = fftw_plan_many_dft(rank,                        // rank
                                 dims,                        // the dimension
@@ -61,19 +61,22 @@ namespace triqs::gfs {
                                 out.indexmap().strides()[0], // stride of the out data
                                 1,                           // out : shift for multi fft.
                                 fftw_backward_forward, FFTW_ESTIMATE);
+
+    auto plan = std::make_unique<fourier_plan_base>( (void *) p );
     
-    return (void *) p;
+    return std::move(plan);
   }
   
-  void _fourier_base(array_const_view<dcomplex, 2> in, array_view<dcomplex, 2> out, void * p) {
+  void _fourier_base(array_const_view<dcomplex, 2> in, array_view<dcomplex, 2> out, fourier_plan & plan) {
 
     auto in_fft  = reinterpret_cast<fftw_complex *>(in.data_start());
     auto out_fft = reinterpret_cast<fftw_complex *>(out.data_start());
 
-    fftw_execute_dft((fftw_plan) p, in_fft, out_fft);
+    fftw_execute_dft((fftw_plan) plan.get()->plan_ptr, in_fft, out_fft);
   }
 
   void _fourier_base_destroy_plan(void * p) { fftw_destroy_plan((fftw_plan) p); }
-  void _fourier_destroy_plan(void * p) { _fourier_base_destroy_plan(p); }
+
+  fourier_plan_base::~fourier_plan_base() { _fourier_base_destroy_plan(plan_ptr); }  
   
 } // namespace triqs::gfs
