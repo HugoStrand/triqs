@@ -119,5 +119,5 @@ external_dependency(nda
 external_dependency(cppdlr
   GIT_REPO https://github.com/flatironinstitute/cppdlr
   VERSION 1.1
-  GIT_TAG 1.1.x
+  GIT_TAG main
 )
